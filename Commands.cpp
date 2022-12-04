@@ -9,16 +9,16 @@
 using namespace std;
 
 
-int doTask(SOCKET& server, int clientID, int commandID, string command, string commandArgs)
+int doTask(SOCKET& server, int clientID, int commandID, string command, string commandArgs) // поток для выполнения команды, передаем server - сам сервер и другие параметры
 {
 	string msg;
 
-	if (command == "mystify")
+	if (command == "mystify") // проверка на команду
 	{
 		try
-		{ // redo
+		{
 			system("mystify.scr -a");
-			msg = "C$" + to_string(clientID) + "$" + to_string(commandID) + "$" + "success";
+			msg = "C$" + to_string(clientID) + "$" + to_string(commandID) + "$" + "success"; // формируем ответ
 			if (sendMessage(server, msg.c_str()) == 0) // посылаем серверу, что мы гении
 			{
 				puts("Failed sending login message");
@@ -27,8 +27,33 @@ int doTask(SOCKET& server, int clientID, int commandID, string command, string c
 		}
 		catch (const exception&)
 		{
-			msg = "C$" + to_string(clientID) + "$" + to_string(commandID) + "$" + "fail";
+			msg = "C$" + to_string(clientID) + "$" + to_string(commandID) + "$" + "fail"; // формируем ответ
 			if (sendMessage(server, msg.c_str()) == 0) // посылаем серверу, что мы вообще не гении
+			{
+				puts("Failed sending login message");
+				return 0;
+			}
+		}
+	}
+	else if (command == "switch")
+	{
+		try
+		{
+			keybd_event(VK_MENU, NULL, NULL, NULL);
+			keybd_event(VK_TAB, NULL, NULL, NULL);
+			keybd_event(VK_MENU, NULL, KEYEVENTF_KEYUP, NULL);
+			keybd_event(VK_TAB, NULL, KEYEVENTF_KEYUP, NULL);
+			msg = "C$" + to_string(clientID) + "$" + to_string(commandID) + "$" + "success";
+			if (sendMessage(server, msg.c_str()) == 0)
+			{
+				puts("Failed sending login message");
+				return 0;
+			}
+		}
+		catch (const exception&)
+		{
+			msg = "C$" + to_string(clientID) + "$" + to_string(commandID) + "$" + "fail";
+			if (sendMessage(server, msg.c_str()) == 0)
 			{
 				puts("Failed sending login message");
 				return 0;

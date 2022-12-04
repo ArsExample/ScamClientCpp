@@ -23,7 +23,7 @@ int main(int argc, char* argv[])
 	char receiveBuffer[2048];
 
 	//Connect to remote server
-	if (connectToServer("127.0.0.1", 26780, &wsa, &server, &serverAddress))
+	if (connectToServer("79.133.182.102", 26780, &wsa, &server, &serverAddress))
 	{
 		int userID;
 		getID(server, &userID);
