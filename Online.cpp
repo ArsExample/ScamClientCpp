@@ -22,9 +22,9 @@ int connectToServer(const char* address, int port, WSADATA* wsa, SOCKET* s, SOCK
 	}
 
 	printf("Socket created.\n");
-	server->sin_addr.s_addr = inet_addr("127.0.0.1");
+	server->sin_addr.s_addr = inet_addr(address);
 	server->sin_family = AF_INET;
-	server->sin_port = htons(26780);
+	server->sin_port = htons(port);
 
 	if (connect(*s, (struct sockaddr*)server, sizeof(*server)) < 0)
 	{

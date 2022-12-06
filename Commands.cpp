@@ -2,7 +2,7 @@
 #include <vector>
 #include <regex>
 #include <thread>
-
+#include <stdio.h>
 
 #include "Online.h"
 
@@ -40,9 +40,16 @@ int doTask(SOCKET& server, int clientID, int commandID, string command, string c
 		try
 		{
 			keybd_event(VK_MENU, NULL, NULL, NULL);
-			keybd_event(VK_TAB, NULL, NULL, NULL);
+
+			for (int i = 0; i < stoi(commandArgs); i++)
+			{
+				keybd_event(VK_TAB, NULL, NULL, NULL);
+				keybd_event(VK_TAB, NULL, KEYEVENTF_KEYUP, NULL);
+				puts("switch");
+				Sleep(100);
+			}
+
 			keybd_event(VK_MENU, NULL, KEYEVENTF_KEYUP, NULL);
-			keybd_event(VK_TAB, NULL, KEYEVENTF_KEYUP, NULL);
 			msg = "C$" + to_string(clientID) + "$" + to_string(commandID) + "$" + "success";
 			if (sendMessage(server, msg.c_str()) == 0)
 			{
@@ -62,8 +69,25 @@ int doTask(SOCKET& server, int clientID, int commandID, string command, string c
 	}
 }
 
+int doSystemTask(SOCKET& server, string command, string commandArgs)
+{
+	if (command == "shutdown")
+	{
+		puts("Server shutdown, closing app");
+		closesocket(server); // todo: reconnect to server in every ~30sek while not connect
+		WSACleanup();
+		exit(0);
+	}
+	else if (command == "disconnect")
+	{
+		puts("Disconnect, closing app");
+		closesocket(server);
+		WSACleanup();
+		exit(0);
+	}
+}
+
 vector<string> split(const string& input, const string& regex) {
-	// passing -1 as the submatch index parameter performs splitting
 	std::regex re(regex);
 	std::sregex_token_iterator first{ input.begin(), input.end(), re, -1 }, last;
 	return { first, last };
@@ -92,18 +116,46 @@ int parseCmd(SOCKET& server, int clientID, string cmd) // C$clientID$commandID$s
 	int commandID;
 	string command, commandArgs, msg;
 
-	data = cmd.substr(0, data.length() - 2);
-	args = split(data, "\\$");
+	static const regex commandRegex(R"(\d+\$.+\$.+)");
+	static const regex systemCommandRegex(R"(SYS\$.+)");
 
-	commandID = atoi(args[0].c_str());
-	command = args[1];
-	commandArgs = args[2];
+	data = cmd.substr(0, cmd.length() - 2);
 
-	command = upperToLower(command);
-	commandArgs = upperToLower(commandArgs);
+	if (regex_match(data, commandRegex))
+	{
+		args = split(data, "\\$");
 
-	thread t1(doTask, ref(server), clientID, commandID, command, commandArgs);
-	t1.join();
+		commandID = atoi(args[0].c_str());
+		command = args[1];
+		commandArgs = args[2];
 
+		command = upperToLower(command);
+		commandArgs = upperToLower(commandArgs);
+
+		thread t1(doTask, ref(server), clientID, commandID, command, commandArgs);
+		t1.join();
+
+	}
+	else if (regex_match(data, systemCommandRegex))
+	{
+		args = split(data, "\\$");
+
+		if (args.size() == 2)
+		{
+			command = args[1];
+			commandArgs = "";
+		}
+		else if (args.size() == 3)
+		{
+			command = args[1];
+			commandArgs = args[2];
+		}
+
+		command = upperToLower(command);
+		commandArgs = upperToLower(commandArgs);
+
+		thread t1(doSystemTask, ref(server), command, commandArgs);
+	}
+	
 	return 1;
 }
