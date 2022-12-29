@@ -3,8 +3,11 @@
 
 
 #pragma comment(lib,"ws2_32.lib")
-#include <stdio.h>
 #include <winsock2.h>
+
+#include <stdexcept>
+#include <stdio.h>	
+#include <iostream>
 #include <string>
 
 #include "Client.h"
@@ -12,19 +15,23 @@
 #include "uniID.h"
 #include "Commands.h"
 
+
 using namespace std;
 
-int WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmdshow)
+//int WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmdshow)
+int main()
 {
 	WSADATA wsa;
 	SOCKET server;
 	SOCKADDR_IN serverAddress;
 
-	char receiveBuffer[2048];
+	srand(time(0) % 0x7ABCFF);
 
 	//Connect to remote server
-	if (connectToServer("79.133.182.102", 26780, &wsa, &server, &serverAddress))
+
+	try
 	{
+		connectToServer("79.133.182.102", 26780, &wsa, &server, &serverAddress);
 		int userID;
 		getID(server, &userID);
 		puts(("Client ID: " + to_string(userID)).c_str());
@@ -32,23 +39,27 @@ int WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmdshow)
 		while (true)
 		{
 			char receiveBuffer[2048];
-
-			if (receiveMessage(server, receiveBuffer, sizeof receiveBuffer) == 0) { // получаем ответ от сервера
-				puts("Failed get data from server"); // C$id клиента$id комманды$успех
-			}
-			else
-			{
-				string data = string(receiveBuffer);
-				puts(("DATA FROM SERVER: " + data).c_str());
-				parseCmd(server, userID, data);
-			}
+			receiveMessage(server, receiveBuffer, sizeof receiveBuffer);
+			string data = string(receiveBuffer);
+			puts(("DATA FROM SERVER: " + data).c_str());
+			parseCmd(server, userID, data);
 		}
 	}
-	else
+	catch (std::runtime_error& err)
 	{
-		puts("Failed");
+		std::cerr << "ERROR OCCURED: " << err.what() << std::endl;
+		closesocket(server);
+		WSACleanup();
+		return -1;
+	}
+	catch (const std::exception&)
+	{
+		closesocket(server);
+		WSACleanup();
+		return -1;
 	}
 
 	closesocket(server);
 	WSACleanup();
+	return 0;
 }
